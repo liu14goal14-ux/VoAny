@@ -1,0 +1,53 @@
+name: Build VoAny APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36 and NDK 27.1.12297006
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Prepare upstreams (strongSwan & lwIP)
+        run: |
+          python3 VoAnyLib/prepare-upstreams.py
+
+      - name: Build OpenSSL 3.5.4 for Android arm64-v8a
+        run: |
+          curl -fSL https://github.com/openssl/openssl/releases/download/openssl-3.5.4/openssl-3.5.4.tar.gz -o /tmp/openssl-3.5.4.tar.gz
+          tar -xzf /tmp/openssl-3.5.4.tar.gz -C /tmp
+          ANDROID_NDK_ROOT="${ANDROID_HOME}/ndk/27.1.12297006" \
+          OPENSSL_SRC="/tmp/openssl-3.5.4" \
+          bash VoAnyLib/native/build-openssl.sh
+
+      - name: Build VoAnyApp Debug APK
+        run: |
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+          chmod +x gradlew
+          ./gradlew :VoAnyApp:assembleDebug -PvoanyPython=python3 --stacktrace
+          ls -lh VoAnyApp/build/outputs/apk/debug/VoAnyApp-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoAnyApp-debug-apk
+          path: VoAnyApp/build/outputs/apk/debug/VoAnyApp-debug.apk
+          if-no-files-found: error
