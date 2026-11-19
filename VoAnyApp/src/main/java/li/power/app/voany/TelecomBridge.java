@@ -25,17 +25,17 @@ public final class TelecomBridge {
     }
     public static boolean enabled(){return registered;}
     public static void placeCall(String number){
-        if(!VoAny.ready())throw new IllegalStateException("IMS is not ready");
-        if(!enabled())throw new IllegalStateException("Telecom account is unavailable");
-        if(!number.matches("\\+?[0-9]{2,20}"))throw new IllegalArgumentException("Enter a phone number");
+        if(!VoAny.ready())throw new IllegalStateException("IMS 尚未就绪，请先在设置页启动服务");
+        if(!enabled())throw new IllegalStateException("系统通话账户不可用");
+        if(!number.matches("\\+?[0-9]{2,20}"))throw new IllegalArgumentException("请输入正确的电话号码");
         TelecomManager manager=app.getSystemService(TelecomManager.class);
-        if(!manager.isOutgoingCallPermitted(account()))throw new IllegalStateException("Android cannot start another call right now");
-        if(app.getSystemService(android.telephony.TelephonyManager.class).isEmergencyNumber(number))throw new IllegalArgumentException("Use the system cellular dialer for emergency calls");
-        Bundle extras=new Bundle();extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE,account());try{manager.placeCall(Uri.fromParts("tel",number,null),extras);}catch(SecurityException e){throw new IllegalStateException("Android denied the VoAny Telecom call",e);}
+        if(!manager.isOutgoingCallPermitted(account()))throw new IllegalStateException("系统当前不允许发起新通话");
+        if(app.getSystemService(android.telephony.TelephonyManager.class).isEmergencyNumber(number))throw new IllegalArgumentException("紧急呼叫请使用系统原生拨号盘");
+        Bundle extras=new Bundle();extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE,account());try{manager.placeCall(Uri.fromParts("tel",number,null),extras);}catch(SecurityException e){throw new IllegalStateException("系统拒绝了 VoAny 通话请求",e);}
     }
     private static void changed(String state,String caller){
         if(state.equals("Incoming call / Ringing") && !announced && connection==null){
-            if(!enabled() || !app.getSystemService(TelecomManager.class).isIncomingCallPermitted(account())){VoAny.reject();VoAny.message="Android cannot accept this call right now";return;}
+            if(!enabled() || !app.getSystemService(TelecomManager.class).isIncomingCallPermitted(account())){VoAny.reject();VoAny.message="系统当前无法接听此来电";return;}
             announced=true;Bundle extras=new Bundle();
             java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?:sips?|tel):([^@;>]+)",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(caller);
             if(m.find())extras.putParcelable(TelecomManager.EXTRA_INCOMING_CALL_ADDRESS,Uri.fromParts("tel",m.group(1),null));

@@ -10,7 +10,7 @@ final class CallPresentation {
     private static final String CHANNEL="voany.calls";
     private static final int ID=301;
     private static Context app;
-    static void initialize(Context context){app=context.getApplicationContext();NotificationChannel channel=new NotificationChannel(CHANNEL,"Calls",NotificationManager.IMPORTANCE_HIGH);channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);app.getSystemService(NotificationManager.class).createNotificationChannel(channel);}
+    static void initialize(Context context){app=context.getApplicationContext();NotificationChannel channel=new NotificationChannel(CHANNEL,"通话提醒",NotificationManager.IMPORTANCE_HIGH);channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);app.getSystemService(NotificationManager.class).createNotificationChannel(channel);}
     static VoAnyConnection find(String token){VoAnyConnection call=TelecomBridge.connection;return call!=null && call.token.equals(token) ? call : null;}
     private static PendingIntent action(VoAnyConnection call,String action,boolean activity){
         Intent intent=new Intent(app,activity ? CallActivity.class : CallActionReceiver.class).setAction(action).setData(Uri.parse("voany-call:"+call.token)).putExtra("call",call.token);
@@ -21,11 +21,11 @@ final class CallPresentation {
     static void update(VoAnyConnection call,boolean incomingUi){
         if(app==null)return;if(call.getState()==Connection.STATE_DISCONNECTED){clear();return;}
         boolean ringing=call.getState()==Connection.STATE_RINGING;
-        String name=call.getAddress()==null || call.getAddressPresentation()!=TelecomManager.PRESENTATION_ALLOWED ? "Private number" : call.getAddress().getSchemeSpecificPart();
+        String name=call.getAddress()==null || call.getAddressPresentation()!=TelecomManager.PRESENTATION_ALLOWED ? "未知号码" : call.getAddress().getSchemeSpecificPart();
         Person person=new Person.Builder().setName(name).setImportant(true).build();
         Notification.Builder builder=new Notification.Builder(app,CHANNEL).setSmallIcon(android.R.drawable.sym_call_incoming)
             .setContentIntent(action(call,"open",true)).setCategory(Notification.CATEGORY_CALL).setOngoing(true).setVisibility(Notification.VISIBILITY_PRIVATE)
-            .setContentText(ringing ? "Incoming call" : call.getState()==Connection.STATE_ACTIVE ? "Connected" : "Calling").setOnlyAlertOnce(true);
+            .setContentText(ringing ? "来电" : call.getState()==Connection.STATE_ACTIVE ? "通话中" : "正在呼叫").setOnlyAlertOnce(true);
         if(ringing){builder.setStyle(Notification.CallStyle.forIncomingCall(person,action(call,"decline",false),action(call,"answer",true)));if(incomingUi)builder.setFullScreenIntent(action(call,"open",true),true);}
         else builder.setStyle(Notification.CallStyle.forOngoingCall(person,action(call,"hangup",false)));
         try{if(!org.voany.lib.VoAnyService.showCallNotification(builder.build()))android.util.Log.w("VoAnyTelecom","Call notification skipped: foreground service stopped");}

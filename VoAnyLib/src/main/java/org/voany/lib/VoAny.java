@@ -13,37 +13,37 @@ import rikka.shizuku.Shizuku;
 public final class VoAny {
     private static Context app;
     private static final ExecutorService io=Executors.newSingleThreadExecutor();
-    public static volatile String network="UNKNOWN",message="Service stopped";
+    public static volatile String network="UNKNOWN",message="服务已停止";
     public static volatile boolean running,epdg,sip;
     public static void initialize(Context context){app=context.getApplicationContext();}
     public static Context context(){if(app==null)throw new IllegalStateException("VoAny.initialize is required");return app;}
     public static SharedPreferences preferences(){return context().getSharedPreferences("voany",Context.MODE_PRIVATE);}
     public static boolean authorized(){try{return Shizuku.pingBinder() && Shizuku.checkSelfPermission()==0;}catch(Exception e){return false;}}
     public static int subscription(){return preferences().getInt("subscription",-1);}
-    public static void select(int id){if(running)throw new IllegalStateException("Stop service before changing SIM");preferences().edit().putInt("subscription",id).apply();SimBridge.select(id);network="UNKNOWN";refreshNetwork();}
+    public static void select(int id){if(running)throw new IllegalStateException("请先停止服务再切换 SIM 卡");preferences().edit().putInt("subscription",id).apply();SimBridge.select(id);network="UNKNOWN";refreshNetwork();}
     public static void subscriptions(Consumer<List<Bundle>> success,Consumer<String> failure){io.execute(()->{try{success.accept(SimBridge.get().getSubscriptions());}catch(Exception e){failure.accept(e.getMessage());}});}
     public static void refreshNetwork(){if(running || !authorized() || subscription()<0)return;final int selected=subscription();io.execute(()->{try{String result=SimBridge.get().getRegistration(selected).getString("registration","UNKNOWN");if(!running && subscription()==selected)network=result;}catch(Exception e){if(!running && subscription()==selected)network="UNKNOWN";}});}
     public static void start(){
-        if(!authorized())throw new IllegalStateException("Start Shizuku and authorize VoAny first");
-        if(subscription()<0)throw new IllegalStateException("Select a SIM in Settings");
-        if(NetworkPolicy.registered(network))throw new IllegalStateException("Network Registered: ePDG is disabled");
+        if(!authorized())throw new IllegalStateException("请先启动 Shizuku 并授权 VoAny");
+        if(subscription()<0)throw new IllegalStateException("请先在设置页选择一张 SIM 卡");
+        if(NetworkPolicy.registered(network))throw new IllegalStateException("该卡已注册蜂窝网络，ePDG 已禁用（请先断开该卡蜂窝信号）");
         context().startForegroundService(new Intent(context(),VoAnyService.class));
     }
-    public static void stop(){preferences().edit().putBoolean("serviceWanted",false).apply();message="Service stopped";context().stopService(new Intent(context(),VoAnyService.class));}
+    public static void stop(){preferences().edit().putBoolean("serviceWanted",false).apply();message="服务已停止";context().stopService(new Intent(context(),VoAnyService.class));}
     public static boolean ready(){return running && epdg && sip && "NOT_REGISTERED".equals(network);}
     public static void dial(String number){ImsController.dial(context(),number);}
     public static void answer(){ImsController.answer();}
     public static void reject(){ImsController.reject();}
     public static void hangup(){ImsController.hangup();}
     public static void sendSms(String number,String text,boolean deliveryReport,LongConsumer queued,Consumer<String> failure){
-        if(!ready())throw new IllegalStateException("IMS is not ready for SMS");
+        if(!ready())throw new IllegalStateException("IMS 尚未就绪，暂不能发送短信");
         ImsController.sendSms(number,text,deliveryReport,queued,failure);
     }
     public static void messages(Consumer<List<org.voany.android.sms.SmsStore.Message>> result,Consumer<String> failure){
-        final int selected=subscription();io.execute(()->{try{result.accept(org.voany.android.sms.SmsStore.get(context()).list(selected));}catch(Exception e){failure.accept("Cannot read IMS messages: "+e.getClass().getSimpleName());}});
+        final int selected=subscription();io.execute(()->{try{result.accept(org.voany.android.sms.SmsStore.get(context()).list(selected));}catch(Exception e){failure.accept("无法读取 IMS 短信："+e.getClass().getSimpleName());}});
     }
     public static void smsc(Consumer<String> result,Consumer<String> failure){
-        final int selected=subscription();io.execute(()->{try{result.accept(SimBridge.get().getSim(selected).getString("smsc",""));}catch(Exception e){failure.accept("Cannot read selected SIM SMSC: "+e.getClass().getSimpleName());}});
+        final int selected=subscription();io.execute(()->{try{result.accept(SimBridge.get().getSim(selected).getString("smsc",""));}catch(Exception e){failure.accept("无法读取所选 SIM 的 SMSC："+e.getClass().getSimpleName());}});
     }
     private VoAny(){}
 }
